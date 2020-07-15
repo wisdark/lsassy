@@ -13,7 +13,7 @@ README = (HERE / "README.md").read_text()
 
 setup(
     name="lsassy",
-    version="2.0.3",
+    version="2.1.2",
     author="Pixis",
     author_email="hackndo@gmail.com",
     description="Python library to parse remote lsass dumps",
@@ -21,11 +21,12 @@ setup(
     long_description_content_type="text/markdown",
     packages=find_packages(exclude=["assets", "cme"]),
     include_package_data=True,
-    url="https://github.com/hackanddo/lsassy",
+    url="https://github.com/Hackndo/lsassy/",
     zip_safe = True,
     license="MIT",
     install_requires=[
         'impacket',
+        'netaddr',
         'pypykatz>=0.3.0'
     ],
     python_requires='>=3.6',

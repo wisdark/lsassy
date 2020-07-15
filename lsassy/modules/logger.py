@@ -19,6 +19,12 @@ class Logger:
         self._align = options.align
         self._verbosity = options.verbosity
         self._quiet = options.quiet
+        if self._verbosity == 2:
+            # This part is to have impacket debug informations
+            import logging
+            from impacket.examples import logger
+            logger.init()
+            logging.getLogger().setLevel(logging.DEBUG)
 
     def info(self, msg):
         if not self._quiet:
@@ -43,10 +49,13 @@ class Logger:
             msg = "\n    ".join(msg.split("\n"))
             print("\033[1;31m[X]\033[0m [{}]{}{}".format(self._target, " "*self._align, msg), file=sys.stderr)
 
-    def success(self, msg):
+    def success(self, msg, output=True):
+        msg = "\n    ".join(msg.split("\n"))
+        out = "\033[1;32m[+]\033[0m [{}]{}{}".format(self._target, " "*self._align, msg)
         if not self._quiet:
-            msg = "\n    ".join(msg.split("\n"))
-            print("\033[1;32m[+]\033[0m [{}]{}{}".format(self._target, " "*self._align, msg))
+            if output:
+                print(out)
+        return (out+"\n")
 
     def raw(self, msg):
         print("{}".format(msg), end='')

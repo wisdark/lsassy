@@ -19,13 +19,14 @@ lock = RLock()
 class Lsassy:
     def __init__(self,
                  hostname, username, domain="", password="", lmhash="", nthash="",
+                 kerberos=False, aesKey="", dc_ip=None,
                  log_options=Logger.Options(),
                  dump_options=Dumper.Options(),
                  parse_options=Parser.Options(),
                  write_options=Writer.Options()
                  ):
 
-        self.conn_options = ImpacketConnection.Options(hostname, domain, username, password, lmhash, nthash)
+        self.conn_options = ImpacketConnection.Options(hostname, domain, username, password, lmhash, nthash, kerberos, aesKey, dc_ip)
         self.log_options = log_options
         self.dump_options = dump_options
         self.parse_options = parse_options
@@ -104,14 +105,11 @@ class Lsassy:
         self._log.info("Cleaning complete")
 
     def get_credentials(self):
-        self.log_options.quiet = True
-        self.log_options.verbosity = False
-        self._log = Logger(self._target, self.log_options)
-        self.write_options.format = "none"
         return_code = self.run()
+        self._writer = Writer(self._target, self._credentials, self._log, self.write_options)
         ret = {
                 "success": True,
-                "credentials": self._credentials
+                "credentials": self._writer.get_output()
             }
         if not return_code.success():
             ret["success"] = False
@@ -173,9 +171,12 @@ class CLI:
 
         # Connection Options
         self.conn_options.hostname = self.target
-        self.conn_options.domain_name = args.domain
-        self.conn_options.username = args.username
-        self.conn_options.password = args.password
+        self.conn_options.domain_name = '' if args.domain is None else args.domain
+        self.conn_options.username = '' if args.username is None else args.username
+        self.conn_options.kerberos = args.kerberos
+        self.conn_options.aes_key = '' if args.aesKey is None else args.aesKey
+        self.conn_options.dc_ip = args.dc_ip
+        self.conn_options.password = '' if args.password is None else args.password
         if not self.conn_options.password and args.hashes:
             if ":" in args.hashes:
                 self.conn_options.lmhash, self.conn_options.nthash = args.hashes.split(":")
@@ -195,6 +196,7 @@ class CLI:
         # Writer Options
         self.write_options.output_file = args.outfile
         self.write_options.format = args.format
+        self.write_options.quiet = args.quiet
 
     def run(self):
         args = get_args()
@@ -206,10 +208,13 @@ class CLI:
             self.conn_options.password,
             self.conn_options.lmhash,
             self.conn_options.nthash,
-            self.log_options,
-            self.dump_options,
-            self.parse_options,
-            self.write_options
+            self.conn_options.kerberos,
+            self.conn_options.aesKey,
+            self.conn_options.dc_ip,
+            log_options=self.log_options,
+            dump_options=self.dump_options,
+            parse_options=self.parse_options,
+            write_options=self.write_options
         )
         return self.lsassy.run()
 
