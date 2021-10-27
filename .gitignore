@@ -2,6 +2,10 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.spec
+
+# Poetry
+poetry.lock
 
 # Distribution / packaging
 .Python
@@ -33,5 +37,5 @@ venv
 # IDE
 .idea
 
-# Tests
-tests/tests_config.py
+.coverage
+.python-version

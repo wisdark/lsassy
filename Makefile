@@ -5,6 +5,7 @@ clean:
 	find . -name '*.pyc' -exec rm -f {} +
 	find . -name '*.pyo' -exec rm -f {} +
 	find . -name '*~' -exec rm -f  {} +
+	find . -name '__pycache__' -exec rm -rf  {} +
 
 publish: clean
 	python3.7 setup.py sdist bdist_wheel
@@ -13,6 +14,14 @@ publish: clean
 testpublish: clean
 	python3.7 setup.py sdist bdist_wheel
 	python3.7 -m twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+
+linux: clean
+	python setup.py install
+	pyinstaller ./lsassy/console.py --onefile --clean -n lsassy_linux_amd64 --additional-hooks-dir=hooks
+
+windows: clean
+	python setup.py install
+	pyinstaller ./lsassy/console.py --onefile --clean -n lsassy_windows_amd64 --additional-hooks-dir=hooks
 
 rebuild: clean
 	python3.7 setup.py install
