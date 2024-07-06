@@ -1,10 +1,7 @@
-from doctest import master
-import logging
 from datetime import datetime
-
 from pypykatz.pypykatz import pypykatz
-
 from lsassy.credential import Credential
+from lsassy.logger import lsassy_logger
 
 
 class Parser:
@@ -12,8 +9,10 @@ class Parser:
     Parse remote lsass dump file using impacketfile and pypykatz
     """
 
-    def __init__(self, dumpfile):
+    def __init__(self, target, dumpfile):
+        self._target = target
         self._dumpfile = dumpfile
+        
 
     def parse(self):
         """
@@ -26,7 +25,7 @@ class Parser:
         try:
             pypy_parse = pypykatz.parse_minidump_external(self._dumpfile, chunksize = 60*1024)
         except Exception as e:
-            logging.error("An error occurred while parsing lsass dump", exc_info=True)
+            lsassy_logger.error("An error occurred while parsing lsass dump", exc_info=True)
             return None
 
         ssps = ['msv_creds', 'wdigest_creds', 'ssp_creds', 'livessp_creds', 'kerberos_creds', 'credman_creds',
@@ -50,7 +49,7 @@ class Parser:
                                      or (NThash and NThash != "00000000000000000000000000000000")
                                      or (LMHash and LMHash != "00000000000000000000000000000000")):
                         credentials.append(
-                            Credential(ssp=ssp, domain=domain, username=username, password=password, lmhash=LMHash,
+                            Credential(hostname=self._target, ssp=ssp, domain=domain, username=username, password=password, lmhash=LMHash,
                                        nthash=NThash, sha1=SHA1))
 
             for kcred in pypy_parse.logon_sessions[luid].kerberos_creds:
@@ -62,7 +61,7 @@ class Parser:
                 if m not in masterkeys:
                     masterkeys.append(m)
                     credentials.append(
-                        Credential(ssp='dpapi', domain='', username='', masterkey=m)
+                        Credential(hostname=self._target, ssp='dpapi', domain='', username='', masterkey=m)
                     )
 
         for cred in pypy_parse.orphaned_creds:
@@ -81,10 +80,12 @@ class Parser:
                     if ticket.EndTime > datetime.now(ticket.EndTime.tzinfo):
 
                         credentials.append(Credential(
+                            hostname=self._target,
                             ssp="kerberos",
                             domain=ticket.DomainName,
                             username=ticket.EClientName[0],
-                            ticket={'file': list(ticket.kirbi_data)[0], 'domain': target_domain, 'endtime': ticket.EndTime}
+                            ticket={'file': list(ticket.kirbi_data)[0].split(".kirbi")[0] + '_' + ticket.EndTime.strftime('%Y%m%d%H%M%S') + ".kirbi", 'domain': target_domain, 'endtime': ticket.EndTime}
                         ))
+                        
 
         return credentials, tickets, masterkeys

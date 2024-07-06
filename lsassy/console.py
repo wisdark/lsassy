@@ -4,6 +4,8 @@ import sys
 from lsassy import __version__
 from lsassy.core import ThreadPool
 from lsassy.dumper import Dumper
+from lsassy.logger import lsassy_logger, LsassyLogger
+import logging
 
 
 def main():
@@ -33,6 +35,7 @@ def main():
     group_dump.add_argument('--time-between-commands', action='store', type=int, default=1,
                             help='Time to wait between dump methods commands (Default 1s)')
     group_dump.add_argument('--parse-only', action='store_true', help='Parse dump without dumping')
+    group_dump.add_argument('--dump-only', action='store_true', help='Dump lsass without parsing it')
     group_dump.add_argument('--keep-dump', action='store_true', help='Do not delete lsass dump on remote host')
 
     group_auth = parser.add_argument_group('authentication')
@@ -81,6 +84,17 @@ def main():
         sys.exit(1)
 
     args = parser.parse_args()
+
+    # Handle no_color parameter with logger
+    lsassy_logger.set_no_color(no_color=args.no_color)
+
+    if args.v == 1:
+        lsassy_logger.setLevel(logging.INFO)
+    elif args.v >= 2:
+        lsassy_logger.setLevel(logging.DEBUG)
+        lsassy_logger.info("lsassy v {}".format(__version__))
+    else:
+        lsassy_logger.setLevel(logging.ERROR)
 
     ThreadPool(args.target, args).run()
 

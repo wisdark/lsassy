@@ -29,8 +29,6 @@
 #     getInterface() method
 #
 
-import logging
-
 from impacket.dcerpc.v5.dcom.oaut import IID_IDispatch, string_to_bin, IDispatch, DISPPARAMS, DISPATCH_PROPERTYGET, \
     VARIANT, VARENUM, DISPATCH_METHOD
 from impacket.dcerpc.v5.dcomrt import DCOMConnection
@@ -40,6 +38,7 @@ from impacket.dcerpc.v5.dcomrt import OBJREF, FLAGS_OBJREF_CUSTOM, OBJREF_CUSTOM
 from impacket.dcerpc.v5.dtypes import NULL
 
 from lsassy.exec import IExec
+from lsassy.logger import lsassy_logger
 
 
 class Exec(IExec):
@@ -72,7 +71,7 @@ class Exec(IExec):
         elif objRefType == FLAGS_OBJREF_EXTENDED:
             objRef = OBJREF_EXTENDED(b''.join(resp))
         else:
-            logging.error("Unknown OBJREF Type! 0x%x" % objRefType)
+            lsassy_logger.error("Unknown OBJREF Type! 0x%x" % objRefType)
 
         return IRemUnknown2(
             INTERFACE(interface.get_cinstance(), None, interface.get_ipidRemUnknown(), objRef['std']['ipid'],
@@ -139,8 +138,9 @@ class Exec(IExec):
             self.__executeShellCommand = (iActiveView, pExecuteShellCommand)
 
         except Exception as e:
-            logging.debug("Error : {}".format(e), exc_info=True)
+            lsassy_logger.debug("Error : {}".format(e), exc_info=True)
             self.clean()
+            raise Exception(e)
 
         dispParams = DISPPARAMS(None, False)
         dispParams['rgdispidNamedArgs'] = NULL
@@ -174,3 +174,5 @@ class Exec(IExec):
         dispParams['rgvarg'].append(arg1)
         dispParams['rgvarg'].append(arg0)
         self.__executeShellCommand[0].Invoke(self.__executeShellCommand[1], 0x409, DISPATCH_METHOD, dispParams, 0, [], [])
+        self.clean()
+        return True
